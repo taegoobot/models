@@ -9,7 +9,7 @@ message EvalConfig {
   optional uint32 num_visualizations = 1 [default=10];
 
   // Number of examples to process of evaluation.
-  optional uint32 num_examples = 2 [default=5000, deprecated=true];
+   optional uint32 num_examples = 2 [default=5000, deprecated=true];
 
   // How often to run evaluation.
   optional uint32 eval_interval_secs = 3 [default=300];
