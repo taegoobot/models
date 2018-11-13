@@ -95,3 +95,5 @@ ENV/
 .DS_Store
 
 samples/outreach/blogs/segmentation_blogpost/carvana-image-masking-challenge/
+
+/Users/bryan.robot/bk-kabrain/dd-image-analyzer/tensorflow-models/research/object_detection/object_detection_tutorial.ipynb
