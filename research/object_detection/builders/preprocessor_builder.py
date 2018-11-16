@@ -244,6 +244,19 @@ def build(preprocessor_step_config):
                 'method': method
             })
 
+  if step_type == 'resize_image_gsd':
+    config = preprocessor_step_config.resize_image_gsd
+    method = RESIZE_METHOD_MAP[config.method]
+    return (preprocessor.resize_image_gsd,
+            {
+                'gsd_normal': config.gsd_normal,
+                'min_height': config.min_height,
+                'min_width': config.min_width,
+                'max_height': config.max_height,
+                'max_width': config.max_width,
+                'method': method
+            })
+
   if step_type == 'ssd_random_crop':
     config = preprocessor_step_config.ssd_random_crop
     if config.operations:

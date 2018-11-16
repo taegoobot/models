@@ -148,6 +148,7 @@ def unstack_batch(tensor_dict, unpad_groundtruth_tensors=True):
             fields.InputDataFields.groundtruth_classes,
             fields.InputDataFields.groundtruth_boxes,
             fields.InputDataFields.groundtruth_keypoints,
+            fields.InputDataFields.groundtruth_gsd,
             fields.InputDataFields.groundtruth_group_of,
             fields.InputDataFields.groundtruth_difficult,
             fields.InputDataFields.groundtruth_is_crowd,
@@ -239,6 +240,9 @@ def create_model_fn(detection_model_fn, configs, hparams, use_tpu=False):
             gt_keypoints_list = None
             if fields.InputDataFields.groundtruth_keypoints in labels:
                 gt_keypoints_list = labels[fields.InputDataFields.groundtruth_keypoints]
+            gt_gsd_list = None
+            if fields.InputDataFields.groundtruth_gsd in labels:
+                gt_gsd_list = labels[fields.InputDataFields.groundtruth_gsd]
             gt_weights_list = None
             if fields.InputDataFields.groundtruth_weights in labels:
                 gt_weights_list = labels[fields.InputDataFields.groundtruth_weights]
@@ -250,6 +254,7 @@ def create_model_fn(detection_model_fn, configs, hparams, use_tpu=False):
                 groundtruth_classes_list=gt_classes_list,
                 groundtruth_masks_list=gt_masks_list,
                 groundtruth_keypoints_list=gt_keypoints_list,
+                groundtruth_gsd_list=gt_gsd_list,
                 groundtruth_weights_list=gt_weights_list,
                 groundtruth_is_crowd_list=gt_is_crowd_list)
 

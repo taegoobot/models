@@ -173,6 +173,8 @@ class TfExampleDecoder(data_decoder.DataDecoder):
             tf.FixedLenFeature((), tf.string, default_value=''),
         'image/source_id':
             tf.FixedLenFeature((), tf.string, default_value=''),
+        'image/gsd':
+            tf.FixedLenFeature((), tf.float32, default_value=1.0),
         'image/height':
             tf.FixedLenFeature((), tf.int64, default_value=1),
         'image/width':
@@ -237,6 +239,8 @@ class TfExampleDecoder(data_decoder.DataDecoder):
             slim_example_decoder.Tensor('image/key/sha256')),
         fields.InputDataFields.filename: (
             slim_example_decoder.Tensor('image/filename')),
+        fields.InputDataFields.groundtruth_gsd: (
+            slim_example_decoder.Tensor('image/gsd')),
         # Object boxes and classes.
         fields.InputDataFields.groundtruth_boxes: (
             slim_example_decoder.BoundingBox(['ymin', 'xmin', 'ymax', 'xmax'],

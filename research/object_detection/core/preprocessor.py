@@ -2370,6 +2370,85 @@ def resize_image(image,
     result.append(tf.stack([new_height, new_width, image_shape[2]]))
     return result
 
+def resize_image_gsd(image,
+                     masks=None,
+                     gsd_normal=0.5,
+                     min_height=300,
+                     min_width=300,
+                     max_height=4000,
+                     max_width=4000,
+                     method=tf.image.ResizeMethod.BILINEAR,
+                     align_corners=False):
+    """Resizes images based on the given gsd_normal value
+
+    Args:
+        image: A 3D tensor of shape [height, width, channels]
+        masks: (optional) rank 3 float32 tensor with shape
+               [num_instances, height, width] containing instance masks.
+        gsd: Image's Ground Sample Distance
+        gsd_normal: GSD for image normalization
+        method: (optional) interpolation method used in resizing. Defaults to
+                BILINEAR.
+        align_corners: bool. If true, exactly align all 4 corners of the input
+                       and output. Defaults to False.
+
+    Returns:
+        Note that the position of the resized_image_shape changes based on whether
+        masks are present.
+        resized_image: A tensor of size [new_height, new_width, channels].
+        resized_masks: If masks is not None, also outputs masks. A 3D tensor of
+          shape [num_instances, new_height, new_width]
+        resized_image_shape: A 1D tensor of shape [3] containing the shape of the
+          resized image.
+    """
+    with tf.name_scope(
+            'ResizeImageGSD',
+            values=[image, gsd, gsd_normal, min_height, min_width, max_height, max_width, method, align_corners]):
+        image_shape = shape_utils.combined_static_and_dynamic_shape(image)
+        height, width = image_shape[:2]
+        height = tf.cast(height, tf.float32)
+        width = tf.cast(width, tf.float32)
+        new_height = tf.cast(tf.multiply(tf.multiply(height, gsd), 1 / gsd_normal), tf.int32, name="image/new_height")
+        new_width = tf.cast(tf.multiply(tf.multiply(width, gsd), 1 / gsd_normal), tf.int32, name="image/new_height")
+
+        new_height = tf.maximum(min_height, new_height)
+        new_width = tf.maximum(min_width, new_width)
+
+        new_height = tf.minimum(max_height, new_height)
+        new_width = tf.minimum(max_width, new_width)
+
+        new_image = tf.image.resize_images(
+            image, tf.stack([new_height, new_width]),
+            method=method,
+            align_corners=align_corners)
+
+        result = [new_image]
+        if masks is not None:
+            num_instances = tf.shape(masks)[0]
+            new_size = tf.stack([new_height, new_width])
+
+            def resize_masks_branch():
+                new_masks = tf.expand_dims(masks, 3)
+                new_masks = tf.image.resize_nearest_neighbor(
+                    new_masks, new_size, align_corners=align_corners)
+                new_masks = tf.squeeze(new_masks, axis=3)
+                return new_masks
+
+            def reshape_masks_branch():
+                # The shape function will be computed for both branches of the
+                # condition, regardless of which branch is actually taken. Make sure
+                # that we don't trigger an assertion in the shape function when trying
+                # to reshape a non empty tensor into an empty one.
+                new_masks = tf.reshape(masks, [-1, new_size[0], new_size[1]])
+                return new_masks
+
+            masks = tf.cond(num_instances > 0, resize_masks_branch,
+                            reshape_masks_branch)
+            result.append(masks)
+
+        result.append(tf.stack([new_height, new_width, image_shape[2]]))
+        return result
+
 
 def subtract_channel_mean(image, means=None):
   """Normalizes an image by subtracting a mean from each channel.
@@ -2969,147 +3048,151 @@ def get_default_func_arg_map(include_label_scores=False,
   Returns:
     A map from preprocessing functions to the arguments they receive.
   """
-  groundtruth_label_scores = None
-  if include_label_scores:
-    groundtruth_label_scores = (
-        fields.InputDataFields.groundtruth_confidences)
+    groundtruth_label_scores = None
+    if include_label_scores:
+        groundtruth_label_scores = (
+            fields.InputDataFields.groundtruth_confidences)
 
-  multiclass_scores = None
-  if include_multiclass_scores:
-    multiclass_scores = (fields.InputDataFields.multiclass_scores)
+    multiclass_scores = None
+    if include_multiclass_scores:
+        multiclass_scores = (fields.InputDataFields.multiclass_scores)
 
-  groundtruth_instance_masks = None
-  if include_instance_masks:
-    groundtruth_instance_masks = (
-        fields.InputDataFields.groundtruth_instance_masks)
+    groundtruth_instance_masks = None
+    if include_instance_masks:
+        groundtruth_instance_masks = (
+            fields.InputDataFields.groundtruth_instance_masks)
 
-  groundtruth_keypoints = None
-  if include_keypoints:
-    groundtruth_keypoints = fields.InputDataFields.groundtruth_keypoints
-
-  prep_func_arg_map = {
-      normalize_image: (fields.InputDataFields.image,),
-      random_horizontal_flip: (
-          fields.InputDataFields.image,
-          fields.InputDataFields.groundtruth_boxes,
-          groundtruth_instance_masks,
-          groundtruth_keypoints,
-      ),
-      random_vertical_flip: (
-          fields.InputDataFields.image,
-          fields.InputDataFields.groundtruth_boxes,
-          groundtruth_instance_masks,
-          groundtruth_keypoints,
-      ),
-      random_rotation90: (
-          fields.InputDataFields.image,
-          fields.InputDataFields.groundtruth_boxes,
-          groundtruth_instance_masks,
-          groundtruth_keypoints,
-      ),
-      random_pixel_value_scale: (fields.InputDataFields.image,),
-      random_image_scale: (
-          fields.InputDataFields.image,
-          groundtruth_instance_masks,
-      ),
-      random_rgb_to_gray: (fields.InputDataFields.image,),
-      random_adjust_brightness: (fields.InputDataFields.image,),
-      random_adjust_contrast: (fields.InputDataFields.image,),
-      random_adjust_hue: (fields.InputDataFields.image,),
-      random_adjust_saturation: (fields.InputDataFields.image,),
-      random_distort_color: (fields.InputDataFields.image,),
-      random_jitter_boxes: (fields.InputDataFields.groundtruth_boxes,),
-      random_crop_image: (fields.InputDataFields.image,
+    groundtruth_keypoints = None
+    if include_keypoints:
+        groundtruth_keypoints = fields.InputDataFields.groundtruth_keypoints
+    prep_func_arg_map = {
+        normalize_image: (fields.InputDataFields.image,),
+        random_horizontal_flip: (
+            fields.InputDataFields.image,
+            fields.InputDataFields.groundtruth_boxes,
+            groundtruth_instance_masks,
+            groundtruth_keypoints,
+        ),
+        random_vertical_flip: (
+            fields.InputDataFields.image,
+            fields.InputDataFields.groundtruth_boxes,
+            groundtruth_instance_masks,
+            groundtruth_keypoints,
+        ),
+        random_rotation90: (
+            fields.InputDataFields.image,
+            fields.InputDataFields.groundtruth_boxes,
+            groundtruth_instance_masks,
+            groundtruth_keypoints,
+        ),
+        random_pixel_value_scale: (fields.InputDataFields.image,),
+        random_image_scale: (
+            fields.InputDataFields.image,
+            groundtruth_instance_masks,
+        ),
+        random_rgb_to_gray: (fields.InputDataFields.image,),
+        random_adjust_brightness: (fields.InputDataFields.image,),
+        random_adjust_contrast: (fields.InputDataFields.image,),
+        random_adjust_hue: (fields.InputDataFields.image,),
+        random_adjust_saturation: (fields.InputDataFields.image,),
+        random_distort_color: (fields.InputDataFields.image,),
+        random_jitter_boxes: (fields.InputDataFields.groundtruth_boxes,),
+        random_crop_image: (fields.InputDataFields.image,
+                            fields.InputDataFields.groundtruth_boxes,
+                            fields.InputDataFields.groundtruth_classes,
+                            groundtruth_label_scores, multiclass_scores,
+                            groundtruth_instance_masks, groundtruth_keypoints),
+        random_pad_image: (fields.InputDataFields.image,
+                           fields.InputDataFields.groundtruth_boxes),
+        random_crop_pad_image: (fields.InputDataFields.image,
+                                fields.InputDataFields.groundtruth_boxes,
+                                fields.InputDataFields.groundtruth_classes,
+                                groundtruth_label_scores, multiclass_scores),
+        random_crop_to_aspect_ratio: (
+            fields.InputDataFields.image,
+            fields.InputDataFields.groundtruth_boxes,
+            fields.InputDataFields.groundtruth_classes,
+            groundtruth_label_scores,
+            multiclass_scores,
+            groundtruth_instance_masks,
+            groundtruth_keypoints,
+        ),
+        random_pad_to_aspect_ratio: (
+            fields.InputDataFields.image,
+            fields.InputDataFields.groundtruth_boxes,
+            groundtruth_instance_masks,
+            groundtruth_keypoints,
+        ),
+        random_black_patches: (fields.InputDataFields.image,),
+        retain_boxes_above_threshold: (
+            fields.InputDataFields.groundtruth_boxes,
+            fields.InputDataFields.groundtruth_classes,
+            groundtruth_label_scores,
+            multiclass_scores,
+            groundtruth_instance_masks,
+            groundtruth_keypoints,
+        ),
+        image_to_float: (fields.InputDataFields.image,),
+        random_resize_method: (fields.InputDataFields.image,),
+        resize_to_range: (
+            fields.InputDataFields.image,
+            groundtruth_instance_masks,
+        ),
+        resize_to_min_dimension: (
+            fields.InputDataFields.image,
+            groundtruth_instance_masks,
+        ),
+        scale_boxes_to_pixel_coordinates: (
+            fields.InputDataFields.image,
+            fields.InputDataFields.groundtruth_boxes,
+            groundtruth_keypoints,
+        ),
+        resize_image: (
+            fields.InputDataFields.image,
+            groundtruth_instance_masks,
+        ),
+        resize_image_gsd: (
+            fields.InputDataFields.image,
+            fields.InputDataFields.groundtruth_gsd,
+            groundtruth_instance_masks,
+        ),
+        subtract_channel_mean: (fields.InputDataFields.image,),
+        one_hot_encoding: (fields.InputDataFields.groundtruth_image_classes,),
+        rgb_to_gray: (fields.InputDataFields.image,),
+        ssd_random_crop: (fields.InputDataFields.image,
                           fields.InputDataFields.groundtruth_boxes,
                           fields.InputDataFields.groundtruth_classes,
                           groundtruth_label_scores, multiclass_scores,
                           groundtruth_instance_masks, groundtruth_keypoints),
-      random_pad_image: (fields.InputDataFields.image,
-                         fields.InputDataFields.groundtruth_boxes),
-      random_crop_pad_image: (fields.InputDataFields.image,
+        ssd_random_crop_pad: (fields.InputDataFields.image,
                               fields.InputDataFields.groundtruth_boxes,
                               fields.InputDataFields.groundtruth_classes,
                               groundtruth_label_scores, multiclass_scores),
-      random_crop_to_aspect_ratio: (
-          fields.InputDataFields.image,
-          fields.InputDataFields.groundtruth_boxes,
-          fields.InputDataFields.groundtruth_classes,
-          groundtruth_label_scores,
-          multiclass_scores,
-          groundtruth_instance_masks,
-          groundtruth_keypoints,
-      ),
-      random_pad_to_aspect_ratio: (
-          fields.InputDataFields.image,
-          fields.InputDataFields.groundtruth_boxes,
-          groundtruth_instance_masks,
-          groundtruth_keypoints,
-      ),
-      random_black_patches: (fields.InputDataFields.image,),
-      retain_boxes_above_threshold: (
-          fields.InputDataFields.groundtruth_boxes,
-          fields.InputDataFields.groundtruth_classes,
-          groundtruth_label_scores,
-          multiclass_scores,
-          groundtruth_instance_masks,
-          groundtruth_keypoints,
-      ),
-      image_to_float: (fields.InputDataFields.image,),
-      random_resize_method: (fields.InputDataFields.image,),
-      resize_to_range: (
-          fields.InputDataFields.image,
-          groundtruth_instance_masks,
-      ),
-      resize_to_min_dimension: (
-          fields.InputDataFields.image,
-          groundtruth_instance_masks,
-      ),
-      scale_boxes_to_pixel_coordinates: (
-          fields.InputDataFields.image,
-          fields.InputDataFields.groundtruth_boxes,
-          groundtruth_keypoints,
-      ),
-      resize_image: (
-          fields.InputDataFields.image,
-          groundtruth_instance_masks,
-      ),
-      subtract_channel_mean: (fields.InputDataFields.image,),
-      one_hot_encoding: (fields.InputDataFields.groundtruth_image_classes,),
-      rgb_to_gray: (fields.InputDataFields.image,),
-      ssd_random_crop: (fields.InputDataFields.image,
-                        fields.InputDataFields.groundtruth_boxes,
-                        fields.InputDataFields.groundtruth_classes,
-                        groundtruth_label_scores, multiclass_scores,
-                        groundtruth_instance_masks, groundtruth_keypoints),
-      ssd_random_crop_pad: (fields.InputDataFields.image,
-                            fields.InputDataFields.groundtruth_boxes,
-                            fields.InputDataFields.groundtruth_classes,
-                            groundtruth_label_scores, multiclass_scores),
-      ssd_random_crop_fixed_aspect_ratio: (
-          fields.InputDataFields.image,
-          fields.InputDataFields.groundtruth_boxes,
-          fields.InputDataFields.groundtruth_classes, groundtruth_label_scores,
-          multiclass_scores, groundtruth_instance_masks, groundtruth_keypoints),
-      ssd_random_crop_pad_fixed_aspect_ratio: (
-          fields.InputDataFields.image,
-          fields.InputDataFields.groundtruth_boxes,
-          fields.InputDataFields.groundtruth_classes,
-          groundtruth_label_scores,
-          multiclass_scores,
-          groundtruth_instance_masks,
-          groundtruth_keypoints,
-      ),
-      convert_class_logits_to_softmax: (multiclass_scores,),
-  }
+        ssd_random_crop_fixed_aspect_ratio: (
+            fields.InputDataFields.image,
+            fields.InputDataFields.groundtruth_boxes,
+            fields.InputDataFields.groundtruth_classes, groundtruth_label_scores,
+            multiclass_scores, groundtruth_instance_masks, groundtruth_keypoints),
+        ssd_random_crop_pad_fixed_aspect_ratio: (
+            fields.InputDataFields.image,
+            fields.InputDataFields.groundtruth_boxes,
+            fields.InputDataFields.groundtruth_classes,
+            groundtruth_label_scores,
+            multiclass_scores,
+            groundtruth_instance_masks,
+            groundtruth_keypoints,
+        ),
+        convert_class_logits_to_softmax: (multiclass_scores,),
+    }
 
-  return prep_func_arg_map
+    return prep_func_arg_map
 
 
 def preprocess(tensor_dict,
                preprocess_options,
                func_arg_map=None,
                preprocess_vars_cache=None):
-  """Preprocess images and bounding boxes.
+    """Preprocess images and bounding boxes.
 
   Various types of preprocessing (to be implemented) based on the
   preprocess_options dictionary e.g. "crop image" (affects image and possibly

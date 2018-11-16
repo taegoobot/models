@@ -241,6 +241,7 @@ class DetectionModel(object):
                           groundtruth_masks_list=None,
                           groundtruth_keypoints_list=None,
                           groundtruth_weights_list=None,
+                          groundtruth_gsd_list=None,
                           groundtruth_is_crowd_list=None,
                           is_annotated_list=None):
     """Provide groundtruth tensors.
@@ -282,6 +283,10 @@ class DetectionModel(object):
     if groundtruth_keypoints_list:
       self._groundtruth_lists[
           fields.BoxListFields.keypoints] = groundtruth_keypoints_list
+
+    if groundtruth_gsd_list:
+      self._groundtruth_lists[
+        fields.InputDataFields.groundtruth_gsd] = groundtruth_gsd_list
     if groundtruth_is_crowd_list:
       self._groundtruth_lists[
           fields.BoxListFields.is_crowd] = groundtruth_is_crowd_list

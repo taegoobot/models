@@ -8,6 +8,7 @@ message ImageResizer {
   oneof image_resizer_oneof {
     KeepAspectRatioResizer keep_aspect_ratio_resizer = 1;
     FixedShapeResizer fixed_shape_resizer = 2;
+    KeepGsdRatioResizer keep_gsd_ratio_resizer = 3;
   }
 }
 
@@ -56,4 +57,28 @@ message FixedShapeResizer {
 
   // Whether to also resize the image channels from 3 to 1 (RGB to grayscale).
   optional bool convert_to_grayscale = 4 [default = false];
+}
+
+// Configuration proto for image resizer that resizes to a fixed shape.
+message KeepGsdRatioResizer {
+  // Desired gsd_ratio
+  optional float gsd_normal = 1 [default = 0.32];
+
+  // Minimum height of image in pixels.
+  optional int32 min_height = 2 [default = 300];
+
+  // Minimum width of image in pixels.
+  optional int32 min_width = 3 [default = 300];
+
+  // Maximum height of image in pixels.
+  optional int32 max_height = 4 [default = 4000];
+
+  // Maximum width of image in pixels.
+  optional int32 max_width = 5 [default = 4000];
+
+  // Desired method when resizing image.
+  optional ResizeType resize_method = 6 [default = AREA];
+
+  // Whether to also resize the image channels from 3 to 1 (RGB to grayscale).
+  optional bool convert_to_grayscale = 7 [default = false];
 }

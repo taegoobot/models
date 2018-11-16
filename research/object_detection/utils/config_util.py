@@ -63,6 +63,8 @@ def get_spatial_image_size(image_resizer_config):
   Raises:
     ValueError: If the model type is not recognized.
   """
+  if image_resizer_config.HasField("keep_gsd_ratio_resizer"):
+    return [-1, -1] # TODO: what if pad is added
   if image_resizer_config.HasField("fixed_shape_resizer"):
     return [
         image_resizer_config.fixed_shape_resizer.height,

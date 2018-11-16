@@ -102,6 +102,19 @@ def build(image_resizer_config):
         method=method)
     if not fixed_shape_resizer_config.convert_to_grayscale:
       return image_resizer_fn
+  # elif image_resizer_oneof == 'keep_gsd_ratio_resizer':
+  #     keep_gsd_ratio_config = image_resizer_config.keep_gsd_ratio_resizer
+  #     method = _tf_resize_method(keep_gsd_ratio_config.resize_method)
+  #     image_resizer_fn = functools.partial(
+  #         preprocessor.resize_image_gsd,
+  #         gsd_normal = keep_gsd_ratio_config.gsd_normal,
+  #         min_height = keep_gsd_ratio_config.min_height,
+  #         min_width = keep_gsd_ratio_config.min_width,
+  #         max_height = keep_gsd_ratio_config.max_height,
+  #         max_width = keep_gsd_ratio_config.max_width,
+  #         method = method)
+  #     if not keep_gsd_ratio_config.convert_to_grayscale:
+  #       return image_resizer_fn
   else:
     raise ValueError(
         'Invalid image resizer option: \'%s\'.' % image_resizer_oneof)

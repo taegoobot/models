@@ -313,7 +313,8 @@ def _get_labels_dict(input_dict):
       fields.InputDataFields.groundtruth_instance_masks,
       fields.InputDataFields.groundtruth_area,
       fields.InputDataFields.groundtruth_is_crowd,
-      fields.InputDataFields.groundtruth_difficult
+      fields.InputDataFields.groundtruth_difficult,
+      fields.InputDataFields.groundtruth_gsd,
   ]
 
   for key in optional_label_keys:

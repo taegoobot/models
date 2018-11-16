@@ -538,7 +538,8 @@ class FasterRCNNMetaArch(model.DetectionModel):
     with tf.name_scope('Preprocessor'):
       outputs = shape_utils.static_or_dynamic_map_fn(
           self._image_resizer_fn,
-          elems=inputs,
+          # elems=[inputs, tf.convert_to_tensor(self.groundtruth_lists(fields.InputDataFields.groundtruth_gsd))],
+          elems=[inputs],
           dtype=[tf.float32, tf.int32],
           parallel_iterations=self._parallel_iterations)
       resized_inputs = outputs[0]

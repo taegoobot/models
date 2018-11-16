@@ -156,8 +156,10 @@ def get_inputs(input_queue,
       raise NotImplementedError('Multi-label support is only for boxes.')
     weights_gt = read_data.get(
         fields.InputDataFields.groundtruth_weights)
+    gsd_gt = read_data.get(
+        fields.InputDataFields.groundtruth_gsd)
     return (image, key, location_gt, classes_gt, masks_gt, keypoints_gt,
-            weights_gt)
+            weights_gt, gsd_gt)
 
   return zip(*map(extract_images_and_targets, read_data_list))
 
@@ -173,7 +175,7 @@ def _create_losses(input_queue, create_model_fn, train_config):
   detection_model = create_model_fn()
   (images, _, groundtruth_boxes_list, groundtruth_classes_list,
    groundtruth_masks_list, groundtruth_keypoints_list,
-   groundtruth_weights_list) = get_inputs(
+   groundtruth_weights_list, groundtruth_gsd_list) = get_inputs(
        input_queue,
        detection_model.num_classes,
        train_config.merge_multiple_label_boxes,
@@ -181,14 +183,6 @@ def _create_losses(input_queue, create_model_fn, train_config):
 
   preprocessed_images = []
   true_image_shapes = []
-  for image in images:
-    resized_image, true_image_shape = detection_model.preprocess(image)
-    preprocessed_images.append(resized_image)
-    true_image_shapes.append(true_image_shape)
-
-  images = tf.concat(preprocessed_images, 0)
-  true_image_shapes = tf.concat(true_image_shapes, 0)
-
   if any(mask is None for mask in groundtruth_masks_list):
     groundtruth_masks_list = None
   if any(keypoints is None for keypoints in groundtruth_keypoints_list):
@@ -199,7 +193,17 @@ def _create_losses(input_queue, create_model_fn, train_config):
       groundtruth_classes_list,
       groundtruth_masks_list,
       groundtruth_keypoints_list,
-      groundtruth_weights_list=groundtruth_weights_list)
+      groundtruth_weights_list=groundtruth_weights_list,
+      groundtruth_gsd_list=groundtruth_gsd_list)
+
+  for image in images:
+    resized_image, true_image_shape = detection_model.preprocess(image)
+    preprocessed_images.append(resized_image)
+    true_image_shapes.append(true_image_shape)
+
+  images = tf.concat(preprocessed_images, 0)
+  true_image_shapes = tf.concat(true_image_shapes, 0)
+
   prediction_dict = detection_model.predict(images, true_image_shapes)
 
   losses_dict = detection_model.loss(prediction_dict, true_image_shapes)

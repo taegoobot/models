@@ -25,6 +25,7 @@ message PreprocessingStep {
     RandomResizeMethod random_resize_method = 17;
     ScaleBoxesToPixelCoordinates scale_boxes_to_pixel_coordinates = 18;
     ResizeImage resize_image = 19;
+    ResizeImageGSD resize_image_gsd = 29;
     SubtractChannelMean subtract_channel_mean = 20;
     SSDRandomCrop ssd_random_crop = 21;
     SSDRandomCropPad ssd_random_crop_pad = 22;
@@ -258,6 +259,22 @@ message ResizeImage {
     NEAREST_NEIGHBOR=4;
   }
   optional Method method = 3 [default=BILINEAR];
+}
+
+// Resizes images to [new_height, new_width] based on gsd (ground sample distance)
+message ResizeImageGSD {
+  optional float gsd_normal = 1 [default=0.5];
+  optional int32 min_height = 2 [default=300];
+  optional int32 min_width = 3 [default=300];
+  optional int32 max_height = 4 [default=4000];
+  optional int32 max_width = 5 [default=4000];
+  enum Method{
+    AREA=1;
+    BICUBIC=2;
+    BILINEAR=3;
+    NEAREST_NEIGHBOR=4;
+  }
+  optional Method method = 6 [default=BILINEAR];
 }
 
 // Normalizes an image by subtracting a mean from each channel.
